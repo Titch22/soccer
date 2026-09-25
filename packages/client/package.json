@@ -1,0 +1,21 @@
+{
+  "name": "@rematch/client",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "typecheck": "tsc --noEmit",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@rematch/shared": "workspace:*",
+    "colyseus.js": "^0.16.22",
+    "pixi.js": "^8.6.1"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.2",
+    "vite": "^6.0.3"
+  }
+}
