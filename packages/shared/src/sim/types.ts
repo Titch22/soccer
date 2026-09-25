@@ -8,7 +8,6 @@ export type PossessionState =
   | "dribbling"
   | "chargingPass"
   | "chargingShot"
-  | "chargingTap"
   | "tackling"
   | "stunned";
 
@@ -27,8 +26,17 @@ export interface PlayerState {
   passChargeMs: number;
   /** Elapsed hold time while possessionState is "chargingShot"; 0 otherwise. */
   shootChargeMs: number;
-  /** Elapsed hold time while possessionState is "chargingTap"; 0 otherwise. */
-  tapChargeMs: number;
+  /** Time until this player may start another tackle lunge. */
+  tackleCooldownMs: number;
+  /** Tap requested near a loose ball, waiting for the player to reach it (0 = nothing queued). */
+  tapQueuedMs: number;
+  tapQueuedDir: Vector2;
+  /** Last tick's tapHeld, for edge detection when queueing a tap. */
+  prevTapHeld: boolean;
+  /** True while in a sprint-initiated slide tackle (vs. a standing tackle). */
+  tackleSliding: boolean;
+  /** True once the current tackle has already hit the ball, so it only connects once. */
+  tackleHitDone: boolean;
   lastInputSeq: number;
 }
 
@@ -66,6 +74,6 @@ export interface InputCommand {
   /** True every tick the shoot button/key is currently held down (level, not edge-triggered). */
   shootHeld: boolean;
   tacklePressed: boolean;
-  /** True every tick the tap-ball button/key is currently held down (level, not edge-triggered). */
+  /** True while a tap is requested (right-stick flick / Q key); the tap goes along aimVector when aimActive. */
   tapHeld: boolean;
 }

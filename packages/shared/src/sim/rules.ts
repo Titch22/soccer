@@ -25,7 +25,8 @@ export function resetForKickoff(state: MatchState): void {
     player.possessionState = "none";
     player.passChargeMs = 0;
     player.shootChargeMs = 0;
-    player.tapChargeMs = 0;
+    player.tackleCooldownMs = 0;
+    player.tapQueuedMs = 0;
     player.stamina = STAMINA_MAX;
   });
   teamBPlayers.forEach((player, i) => {
@@ -34,7 +35,8 @@ export function resetForKickoff(state: MatchState): void {
     player.possessionState = "none";
     player.passChargeMs = 0;
     player.shootChargeMs = 0;
-    player.tapChargeMs = 0;
+    player.tackleCooldownMs = 0;
+    player.tapQueuedMs = 0;
     player.stamina = STAMINA_MAX;
   });
 }
@@ -58,7 +60,8 @@ export function placeLateJoinSpawn(state: MatchState, player: PlayerState): void
   player.possessionState = "none";
   player.passChargeMs = 0;
   player.shootChargeMs = 0;
-  player.tapChargeMs = 0;
+  player.tackleCooldownMs = 0;
+  player.tapQueuedMs = 0;
   player.stamina = STAMINA_MAX;
 }
 

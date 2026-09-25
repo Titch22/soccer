@@ -127,6 +127,7 @@ async function main() {
     lastTime = now;
     if (frameDt > 250) frameDt = 250;
     accumulator += frameDt;
+    input.pollFlick(now);
 
     const state: MatchState | null = net.getState();
     const selfId = net.sessionId;
@@ -152,13 +153,24 @@ async function main() {
       seenIds.add(player.id);
       let view = playerViews.get(player.id);
       if (!view) {
-        view = createPlayerView(TEAM_COLORS[player.teamId]);
+        view = createPlayerView(TEAM_COLORS[player.teamId], player.id === selfId);
         playerViews.set(player.id, view);
         app.stage.addChild(view.container);
       }
       const screen = toScreen(player.position.x, player.position.y);
       view.container.position.set(screen.x, screen.y);
       view.setFacing(player.facing);
+      view.setStatus(
+        {
+          sprinting: player.isSprinting,
+          possessing: state.ball.possessedByPlayerId === player.id,
+          tackling: player.possessionState === "tackling",
+          stunned: player.possessionState === "stunned",
+          velocityAngle: Math.atan2(player.velocity.y, player.velocity.x),
+          speed: Math.hypot(player.velocity.x, player.velocity.y),
+        },
+        performance.now(),
+      );
       view.container.alpha = player.id === selfId ? 1 : 0.85;
 
       // Local-only indicators: never reveal another client's pass charge/aim,

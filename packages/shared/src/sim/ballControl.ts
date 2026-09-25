@@ -6,6 +6,9 @@ import {
   DRIBBLE_RADIUS,
   PASS_ASSIST_CONE_RADIANS,
   PASS_ASSIST_MAX_DISTANCE,
+  BALL_CATCH_MAX_SPEED,
+  BALL_INTERACT_INDICATOR_RADIUS,
+  TAP_QUEUE_MS,
   PASS_BASE_SPEED,
   PASS_CHARGE_MAX_MS,
   PICKUP_CLOSING_SPEED_WEIGHT,
@@ -17,15 +20,13 @@ import {
   SHOOT_SWAY_FREE_WINDOW_MS,
   SHOOT_SWAY_MAX_RADIANS,
   SHOOT_SWAY_PERIOD_MS,
-  TACKLE_DURATION_MS,
-  TACKLE_LUNGE_SPEED,
-  TACKLE_RANGE,
+  SLIDING_TACKLE,
+  STANDING_TACKLE,
   TACKLE_STUN_DURATION_MS,
-  TAP_CHARGE_MAX_MS,
   TAP_RELEASE_LOCK_DURATION_MS,
   TAP_SPEED,
 } from "./constants";
-import type { BallState, InputCommand, PlayerState } from "./types";
+import type { BallState, InputCommand, PlayerState, Vector2 } from "./types";
 import { add, distance, dot, length, moveToward, normalize, scale, sub } from "./vec";
 
 interface BallControlContext {
@@ -45,10 +46,13 @@ interface BallControlContext {
  */
 function findDribbler(ctx: BallControlContext): PlayerState | null {
   const { players, ball } = ctx;
+  // Too fast to trap: nobody claims it, the normal body collision deflects it.
+  if (length(ball.velocity) > BALL_CATCH_MAX_SPEED) return null;
   let best: PlayerState | null = null;
   let bestScore = -Infinity;
   for (const player of Object.values(players)) {
-    if (player.possessionState === "stunned") continue;
+    // A tackling player never gains possession - they only hit the ball away.
+    if (player.possessionState === "stunned" || player.possessionState === "tackling") continue;
     if (player.id === ball.releaseLockPlayerId) continue;
     const toBall = sub(ball.position, player.position);
     const dist = length(toBall);
@@ -113,25 +117,49 @@ export function applyBallControl(ctx: BallControlContext): void {
   }
 
   for (const player of Object.values(players)) {
+    player.tackleCooldownMs = Math.max(0, player.tackleCooldownMs - dtMs);
     const input = inputsByPlayer.get(player.id);
-    if (!input?.tacklePressed || player.possessionState !== "none") continue;
-    const dToBall = distance(player.position, ball.position);
-    if (dToBall <= TACKLE_RANGE && ball.possessedByPlayerId && ball.possessedByPlayerId !== player.id) {
-      const defender = players[ball.possessedByPlayerId];
-      if (defender && defender.teamId !== player.teamId) {
-        const dir = normalize(sub(ball.position, player.position));
-        player.velocity = scale(dir, TACKLE_LUNGE_SPEED);
-        player.possessionState = "tackling";
-        player.possessionTimer = TACKLE_DURATION_MS;
-        defender.possessionState = "stunned";
-        defender.possessionTimer = TACKLE_STUN_DURATION_MS;
-        defender.passChargeMs = 0;
-        defender.shootChargeMs = 0;
-        defender.tapChargeMs = 0;
-        ball.possessedByPlayerId = null;
-        ball.velocity = add(ball.velocity, scale(dir, 60));
-      }
+
+    // A tackle can be started any time (not only near the ball). Sprinting
+    // makes it a slide tackle; otherwise it's a shorter standing tackle.
+    if (input?.tacklePressed && player.possessionState === "none" && player.tackleCooldownMs <= 0) {
+      const sliding = player.isSprinting;
+      const profile = sliding ? SLIDING_TACKLE : STANDING_TACKLE;
+      const hasMoveInput = length(input.moveVector) > 1e-3;
+      const dir = hasMoveInput
+        ? normalize(input.moveVector)
+        : { x: Math.cos(player.facing), y: Math.sin(player.facing) };
+      player.facing = Math.atan2(dir.y, dir.x);
+      player.velocity = scale(dir, profile.lungeSpeed);
+      player.possessionState = "tackling";
+      player.possessionTimer = profile.durationMs;
+      player.tackleCooldownMs = profile.cooldownMs;
+      player.tackleSliding = sliding;
+      player.tackleHitDone = false;
     }
+
+    if (player.possessionState !== "tackling" || player.tackleHitDone) continue;
+    const profile = player.tackleSliding ? SLIDING_TACKLE : STANDING_TACKLE;
+    if (distance(player.position, ball.position) > profile.range) continue;
+
+    const holder = ball.possessedByPlayerId ? players[ball.possessedByPlayerId] : null;
+    // Can't tackle a teammate's dribble; a loose ball is always fair game.
+    if (holder && (holder.id === player.id || holder.teamId === player.teamId)) continue;
+
+    // Send the ball flying away from the tackler, whether it was held or loose.
+    const toBall = sub(ball.position, player.position);
+    const dir = length(toBall) > 1e-3 ? normalize(toBall) : { x: Math.cos(player.facing), y: Math.sin(player.facing) };
+    if (holder) {
+      holder.possessionState = "stunned";
+      holder.possessionTimer = TACKLE_STUN_DURATION_MS;
+      holder.passChargeMs = 0;
+      holder.shootChargeMs = 0;
+      ball.possessedByPlayerId = null;
+    }
+    ball.velocity = scale(dir, profile.ballHitSpeed);
+    ball.lastTouchedByPlayerId = player.id;
+    ball.lastTouchedTeamId = player.teamId;
+    player.tackleHitDone = true;
   }
 
   const currentHolder = ball.possessedByPlayerId ? players[ball.possessedByPlayerId] : null;
@@ -177,22 +205,18 @@ export function applyBallControl(ctx: BallControlContext): void {
         if (timedOut || released) {
           fireShot(dribbler, ball, input);
         }
-      } else if (dribbler.possessionState === "chargingTap") {
-        dribbler.tapChargeMs += dtMs;
-        const timedOut = dribbler.tapChargeMs >= TAP_CHARGE_MAX_MS;
-        const released = !input?.tapHeld;
-        if (timedOut || released) {
-          tapBall(dribbler, ball);
-        }
       } else if (input?.passHeld) {
         dribbler.possessionState = "chargingPass";
         dribbler.passChargeMs = 0;
       } else if (input?.shootHeld) {
         dribbler.possessionState = "chargingShot";
         dribbler.shootChargeMs = 0;
-      } else if (input?.tapHeld) {
-        dribbler.possessionState = "chargingTap";
-        dribbler.tapChargeMs = 0;
+      } else if ((input?.tapHeld || dribbler.tapQueuedMs > 0) && dribbler.possessionState === "dribbling") {
+        // A tap queued while running onto the ball goes in the direction chosen
+        // when it was requested; otherwise use the live aim.
+        const queuedDir = dribbler.tapQueuedMs > 0 ? dribbler.tapQueuedDir : null;
+        tapBall(dribbler, ball, queuedDir ?? tapDirectionFromInput(dribbler, input));
+        dribbler.tapQueuedMs = 0;
       }
     }
   }
@@ -282,30 +306,76 @@ function fireShot(dribbler: PlayerState, ball: BallState, input: InputCommand | 
 }
 
 /**
- * Fires the tap along the player's locked facing - frozen the instant the
- * charge started (see playerMovement.ts) and never updated during the hold,
- * exactly like a mini pass. Short release lock so it actually separates from
- * the player first, but far shorter than pass/shoot's - the whole point is
- * that the same player can chase the ball down and reclaim it a beat later,
- * not instantly re-glue it to their own feet.
+ * Instant tap toward the aim direction (right-stick flick / mouse), falling
+ * back to facing when there's no aim. Short release lock so it actually
+ * separates from the player first, but far shorter than pass/shoot's - the
+ * point is that the same player can chase the ball down and reclaim it a
+ * beat later, not instantly re-glue it to their own feet.
  */
-function tapBall(dribbler: PlayerState, ball: BallState): void {
+function tapDirectionFromInput(player: PlayerState, input: InputCommand | undefined): Vector2 {
+  const aim = input?.aimActive && length(input.aimVector) > 1e-3 ? normalize(input.aimVector) : null;
+  return aim ?? { x: Math.cos(player.facing), y: Math.sin(player.facing) };
+}
+
+function tapBall(dribbler: PlayerState, ball: BallState, tapDir: Vector2): void {
   releaseFromDribble(dribbler, ball);
-  const tapDir = { x: Math.cos(dribbler.facing), y: Math.sin(dribbler.facing) };
   ball.velocity = scale(tapDir, TAP_SPEED);
   ball.releaseLockPlayerId = dribbler.id;
   ball.releaseLockMs = TAP_RELEASE_LOCK_DURATION_MS;
-  dribbler.tapChargeMs = 0;
 }
 
 function releaseFromDribble(player: PlayerState, ball: BallState): void {
   if (
     player.possessionState === "dribbling" ||
     player.possessionState === "chargingPass" ||
-    player.possessionState === "chargingShot" ||
-    player.possessionState === "chargingTap"
+    player.possessionState === "chargingShot"
   ) {
     player.possessionState = "none";
   }
   ball.possessedByPlayerId = null;
+}
+
+function isNearLooseBall(player: PlayerState, ball: BallState): boolean {
+  return (
+    player.possessionState === "none" &&
+    ball.possessedByPlayerId === null &&
+    player.id !== ball.releaseLockPlayerId &&
+    length(ball.velocity) <= BALL_CATCH_MAX_SPEED &&
+    distance(player.position, ball.position) < BALL_INTERACT_INDICATOR_RADIUS
+  );
+}
+
+/**
+ * Runs before movement each tick: remembers a tap requested (rising edge)
+ * while the ball indicator is up, so the player can run onto the ball first.
+ */
+export function updateQueuedBallAction(
+  player: PlayerState,
+  ball: BallState,
+  input: InputCommand | undefined,
+  dtMs: number,
+): void {
+  const tapHeld = input?.tapHeld ?? false;
+  player.tapQueuedMs = Math.max(0, player.tapQueuedMs - dtMs);
+  if (tapHeld && !player.prevTapHeld && isNearLooseBall(player, ball)) {
+    player.tapQueuedMs = TAP_QUEUE_MS;
+    player.tapQueuedDir = tapDirectionFromInput(player, input);
+  }
+  player.prevTapHeld = tapHeld;
+}
+
+/**
+ * While the ball indicator is up (loose, catchable, within reach) and the
+ * player asks for a possession action (pass/shoot held, or a queued tap), they
+ * automatically run onto the ball; possession plus the action then happen the
+ * normal way as soon as they reach it. Returns the input movement should use.
+ */
+export function resolveBallActionApproach(
+  player: PlayerState,
+  ball: BallState,
+  input: InputCommand | undefined,
+): InputCommand | undefined {
+  if (!input || !isNearLooseBall(player, ball)) return input;
+  if (!input.passHeld && !input.shootHeld && player.tapQueuedMs <= 0) return input;
+  return { ...input, moveVector: normalize(sub(ball.position, player.position)) };
 }

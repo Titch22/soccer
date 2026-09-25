@@ -49,6 +49,10 @@ export const DRIBBLE_OFFSET_SPRINT = PLAYER_RADIUS + BALL_RADIUS * 1.6;
 export const DRIBBLE_CORRECTION_SPEED = 500;
 export const DRIBBLE_CORRECTION_SPEED_SPRINT = 350;
 
+// A loose ball moving faster than this can't be trapped: it bounces off the player instead.
+// Just above PASS_BASE_SPEED so passes stay receivable, while shots (>= SHOOT_MIN_SPEED) deflect.
+export const BALL_CATCH_MAX_SPEED = 280;
+
 export const PASS_ASSIST_CONE_RADIANS = Math.PI / 6;
 export const PASS_ASSIST_MAX_DISTANCE = 400;
 export const PASS_BASE_SPEED = 260;
@@ -74,16 +78,15 @@ export const SHOOT_RUNNING_AIM_MIN_SPEED = 20;
 // re-claiming dribble possession of the same ball.
 export const RELEASE_LOCK_DURATION_MS = 300;
 
-// Quick "tap the ball forward" touch - a mini pass: holding the button locks
-// the player's current direction (like a pass charge) and releasing (or
-// hitting this much shorter timeout) fires the tap along that locked
-// direction. Speed is derived so the ball's friction deceleration
-// (distance = v^2 / 2a) brings it to rest right around
-// BALL_INTERACT_INDICATOR_RADIUS away, not an arbitrary distance - continuing
-// to run the same direction should put the "you can act on it" indicator
-// back on screen almost immediately.
-export const TAP_SPEED = Math.sqrt(2 * BALL_FRICTION * BALL_INTERACT_INDICATOR_RADIUS);
-export const TAP_CHARGE_MAX_MS = 200;
+// Quick "tap the ball" touch, fired instantly by flicking the right stick (or
+// Q on keyboard). Speed is derived so the ball's friction deceleration
+// (distance = v^2 / 2a) brings it to rest TAP_TRAVEL_DISTANCE away: a bit past
+// BALL_INTERACT_INDICATOR_RADIUS, so continuing to run the same direction
+// puts the "you can act on it" indicator back on screen almost immediately.
+// A tap requested near a loose ball is remembered this long while the player runs onto it.
+export const TAP_QUEUE_MS = 450;
+export const TAP_TRAVEL_DISTANCE = BALL_INTERACT_INDICATOR_RADIUS * 1.6;
+export const TAP_SPEED = Math.sqrt(2 * BALL_FRICTION * TAP_TRAVEL_DISTANCE);
 // Derived, not guessed: the time for the tapped ball to travel past
 // DRIBBLE_RADIUS under friction deceleration (d = v0*t - 1/2*a*t^2, solved
 // for the first t where d = DRIBBLE_RADIUS), plus a small safety margin for
@@ -96,10 +99,44 @@ export const TAP_RELEASE_LOCK_DURATION_MS =
   ((TAP_SPEED - Math.sqrt(TAP_SPEED * TAP_SPEED - 2 * BALL_FRICTION * DRIBBLE_RADIUS)) / BALL_FRICTION) * 1000 +
   50;
 
-export const TACKLE_RANGE = PLAYER_RADIUS * 2 + 6;
-export const TACKLE_LUNGE_SPEED = 420;
-export const TACKLE_DURATION_MS = 250;
 export const TACKLE_STUN_DURATION_MS = 400;
+
+export interface TackleProfile {
+  /** Initial lunge speed. */
+  lungeSpeed: number;
+  /** How long the player stays in the committed "tackling" state. */
+  durationMs: number;
+  /** Speed lost per second while lunging (lower = slides further). */
+  decel: number;
+  /** How close the ball must be to the tackler to be hit / stolen. */
+  range: number;
+  /** Time before another tackle can start, measured from the start of the lunge. */
+  cooldownMs: number;
+  /** Speed the ball is sent flying at when hit. */
+  ballHitSpeed: number;
+}
+
+const TACKLE_BASE_RANGE = PLAYER_RADIUS * 2 + 6;
+
+/** Short, quick tackle from a standing/walking start: ball hit at pass strength. */
+export const STANDING_TACKLE: TackleProfile = {
+  lungeSpeed: 260,
+  durationMs: 200,
+  decel: 900,
+  range: TACKLE_BASE_RANGE,
+  cooldownMs: 600,
+  ballHitSpeed: PASS_BASE_SPEED,
+};
+
+/** Slide tackle while sprinting: reaches further and hits harder, but leaves you locked out much longer. */
+export const SLIDING_TACKLE: TackleProfile = {
+  lungeSpeed: 470,
+  durationMs: 400,
+  decel: 700,
+  range: TACKLE_BASE_RANGE + 10,
+  cooldownMs: 1400,
+  ballHitSpeed: PASS_BASE_SPEED * 1.4,
+};
 
 export const MATCH_DURATION_MS = 5 * 60 * 1000;
 

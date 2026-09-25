@@ -4,6 +4,8 @@ import {
   PLAYER_MAX_SPEED,
   PLAYER_SPRINT_MAX_SPEED,
   PLAYER_TURN_ACCEL_FACTOR_MIN,
+  SLIDING_TACKLE,
+  STANDING_TACKLE,
   STAMINA_DRAIN_PER_SECOND,
   STAMINA_MAX,
   STAMINA_REGEN_PER_SECOND,
@@ -20,16 +22,25 @@ export function applyPlayerMovement(
 ): PlayerState {
   const dt = dtSeconds(dtMs);
 
-  // Charging a pass or a tap locks out steering: no acceleration/deceleration
-  // from input, so the player just carries their current velocity forward
-  // unchanged. For a pass, facing is driven by the aim stick instead (see
-  // applyBallControl); for a tap, facing simply stays frozen at whatever it
-  // was the instant the charge started, since a tap fires along that locked
-  // direction rather than a live aim.
+  // A tackle lunge is committed: no steering, the lunge speed just bleeds off
+  // with friction until the tackle state ends.
+  if (player.possessionState === "tackling") {
+    const speed = length(player.velocity);
+    const velocity = speed > 1e-3 ? scale(player.velocity, Math.max(0, speed - (player.tackleSliding ? SLIDING_TACKLE : STANDING_TACKLE).decel * dt) / speed) : player.velocity;
+    return {
+      ...player,
+      velocity,
+      position: add(player.position, scale(velocity, dt)),
+      lastInputSeq: input?.seq ?? player.lastInputSeq,
+    };
+  }
+
+  // Charging a pass locks out steering: no acceleration/deceleration from
+  // input, so the player just carries their current velocity forward
+  // unchanged. Facing is driven by the aim stick instead (see applyBallControl).
   const isChargingOrStartingToCharge =
     player.possessionState === "chargingPass" ||
-    player.possessionState === "chargingTap" ||
-    (player.possessionState === "dribbling" && ((input?.passHeld ?? false) || (input?.tapHeld ?? false)));
+    (player.possessionState === "dribbling" && (input?.passHeld ?? false));
 
   if (isChargingOrStartingToCharge) {
     const position = add(player.position, scale(player.velocity, dt));

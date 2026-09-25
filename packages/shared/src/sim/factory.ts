@@ -15,7 +15,12 @@ export function createPlayer(id: string, teamId: "A" | "B"): PlayerState {
     possessionTimer: 0,
     passChargeMs: 0,
     shootChargeMs: 0,
-    tapChargeMs: 0,
+    tackleCooldownMs: 0,
+    tapQueuedMs: 0,
+    tapQueuedDir: { x: 1, y: 0 },
+    prevTapHeld: false,
+    tackleSliding: false,
+    tackleHitDone: false,
     lastInputSeq: 0,
   };
 }

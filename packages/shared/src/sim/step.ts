@@ -1,4 +1,4 @@
-import { applyBallControl } from "./ballControl";
+import { applyBallControl, resolveBallActionApproach, updateQueuedBallAction } from "./ballControl";
 import {
   BALL_FRICTION,
   BALL_RESTITUTION,
@@ -47,7 +47,9 @@ export function simulateTick(
 
   for (const player of Object.values(next.players)) {
     const input = inputsByPlayer.get(player.id);
-    Object.assign(player, applyPlayerMovement(player, input, dtMs));
+    updateQueuedBallAction(player, next.ball, input, dtMs);
+    const moveInput = resolveBallActionApproach(player, next.ball, input);
+    Object.assign(player, applyPlayerMovement(player, moveInput, dtMs));
   }
 
   const playerList = Object.values(next.players);
@@ -74,6 +76,8 @@ export function simulateTick(
       // straight off their own body a tick after release and corrupt the
       // velocity/direction they just fired it with.
       if (player.id === next.ball.releaseLockPlayerId) continue;
+      // Tackles hit the ball explicitly (see applyBallControl); skip the generic body bounce.
+      if (player.possessionState === "tackling") continue;
       resolvePlayerBallCollision(player, next.ball, PLAYER_BALL_RESTITUTION);
     }
     resolveBallBoundaryCollision(next.ball, BALL_RESTITUTION);

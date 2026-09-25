@@ -39,21 +39,21 @@ export class GamepadSource {
     const moveLen = Math.hypot(moveX, moveY) || 1;
     const aimLen = Math.hypot(aimX, aimY);
 
-    // Standard gamepad mapping: 0 = A/Cross, 1 = B/Circle, 2 = X/Square, 4 = LB/L1, 7 = RT/R2.
+    // Standard gamepad mapping: 1 = B/Circle, 2 = X/Square, 4 = LB/L1, 7 = RT/R2.
     const sprint = pad.buttons[4]?.pressed ?? false;
     const shootHeld = pad.buttons[7]?.pressed ?? false;
     const passHeld = pad.buttons[2]?.pressed ?? false;
     const tacklePressed = pad.buttons[1]?.pressed ?? false;
-    const tapHeld = pad.buttons[0]?.pressed ?? false;
 
     return {
       moveVector: { x: moveX / moveLen, y: moveY / moveLen },
+      /** Right-stick deflection (0..~1.4 on a square-gated stick), used for flick detection. */
+      aimMagnitude: aimLen,
       aimVector: aimLen > DEADZONE ? { x: aimX / aimLen, y: aimY / aimLen } : null,
       sprint,
       shootHeld,
       passHeld,
       tacklePressed,
-      tapHeld,
     };
   }
 }
