@@ -4,7 +4,17 @@ import { WebSocketTransport } from "@colyseus/ws-transport";
 import { MatchRoom } from "./rooms/MatchRoom.js";
 
 const port = Number(process.env.PORT ?? 2567);
-const httpServer = createServer();
+// Behind a reverse proxy the game server should only be reachable locally.
+const host = process.env.HOST ?? (process.env.NODE_ENV === "production" ? "127.0.0.1" : "0.0.0.0");
+
+const httpServer = createServer((req, res) => {
+  if (req.url === "/health") {
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({ status: "ok" }));
+    return;
+  }
+  // Non-health requests are handled by Colyseus (matchmaking) via its own listeners.
+});
 
 const gameServer = new Server({
   transport: new WebSocketTransport({ server: httpServer }),
@@ -12,6 +22,18 @@ const gameServer = new Server({
 
 gameServer.define("match", MatchRoom);
 
-httpServer.listen(port, () => {
-  console.log(`[server] rematch-web server listening on ws://localhost:${port}`);
+httpServer.listen(port, host, () => {
+  console.log(`[server] rematch-web server listening on ${host}:${port}`);
 });
+
+async function shutdown(signal: string) {
+  console.log(`[server] ${signal} received, shutting down`);
+  try {
+    await gameServer.gracefullyShutdown(false);
+  } finally {
+    process.exit(0);
+  }
+}
+
+process.on("SIGTERM", () => void shutdown("SIGTERM"));
+process.on("SIGINT", () => void shutdown("SIGINT"));

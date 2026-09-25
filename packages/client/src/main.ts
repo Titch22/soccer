@@ -23,7 +23,12 @@ import { NetConnection } from "./net/connection";
 import { createPitchView } from "./render/PitchView";
 import { createPixiApp } from "./render/PixiApp";
 
-const SERVER_URL = "ws://localhost:2567";
+// Dev talks to the local server directly; production goes through the reverse proxy on /ws.
+const SERVER_URL =
+  import.meta.env.VITE_SERVER_URL ??
+  (import.meta.env.DEV
+    ? "ws://localhost:2567"
+    : `${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/ws`);
 const TEAM_COLORS: Record<"A" | "B", number> = { A: 0x2255ee, B: 0xee3322 };
 const GOAL_TOAST_DURATION_MS = 1800;
 
