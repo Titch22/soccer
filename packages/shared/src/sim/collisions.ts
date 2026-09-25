@@ -1,6 +1,21 @@
-import { GOAL_BOTTOM, GOAL_TOP, PITCH_HEIGHT, PITCH_WIDTH, PLAYER_RADIUS } from "./constants";
+import {
+  GOAL_BOTTOM,
+  GOAL_TOP,
+  PITCH_HEIGHT,
+  PITCH_WIDTH,
+  DEFEND_HITBOX_SCALE,
+  PLAYER_RADIUS,
+  STRAFE_HITBOX_SCALE,
+} from "./constants";
 import type { BallState, PlayerState, Vector2 } from "./types";
 import { add, distance, length, normalize, scale, sub } from "./vec";
+
+/** Current hitbox radius: a plain circle (orientation-independent) that grows in defensive stance and more so while strafing. */
+export function getPlayerRadius(player: PlayerState): number {
+  if (player.isStrafing) return PLAYER_RADIUS * STRAFE_HITBOX_SCALE;
+  if (player.isDefending) return PLAYER_RADIUS * DEFEND_HITBOX_SCALE;
+  return PLAYER_RADIUS;
+}
 
 export function resolvePlayerPlayerCollisions(players: PlayerState[]): void {
   for (let i = 0; i < players.length; i++) {
@@ -9,7 +24,7 @@ export function resolvePlayerPlayerCollisions(players: PlayerState[]): void {
       const b = players[j]!;
       const delta = sub(b.position, a.position);
       const dist = length(delta);
-      const minDist = PLAYER_RADIUS * 2;
+      const minDist = getPlayerRadius(a) + getPlayerRadius(b);
       if (dist > 0 && dist < minDist) {
         const overlap = minDist - dist;
         const push = scale(normalize(delta), overlap / 2);
@@ -21,14 +36,9 @@ export function resolvePlayerPlayerCollisions(players: PlayerState[]): void {
 }
 
 export function clampPlayerToPitch(player: PlayerState): void {
-  player.position.x = Math.max(
-    PLAYER_RADIUS,
-    Math.min(PITCH_WIDTH - PLAYER_RADIUS, player.position.x),
-  );
-  player.position.y = Math.max(
-    PLAYER_RADIUS,
-    Math.min(PITCH_HEIGHT - PLAYER_RADIUS, player.position.y),
-  );
+  const radius = getPlayerRadius(player);
+  player.position.x = Math.max(radius, Math.min(PITCH_WIDTH - radius, player.position.x));
+  player.position.y = Math.max(radius, Math.min(PITCH_HEIGHT - radius, player.position.y));
 }
 
 export function resolveBallBoundaryCollision(ball: BallState, restitution: number): void {
@@ -61,7 +71,7 @@ export function resolvePlayerBallCollision(
 ): void {
   const delta: Vector2 = sub(ball.position, player.position);
   const dist = length(delta);
-  const minDist = PLAYER_RADIUS + 8;
+  const minDist = getPlayerRadius(player) + 8;
   if (dist > 0 && dist < minDist) {
     const overlap = minDist - dist;
     const dir = normalize(delta);

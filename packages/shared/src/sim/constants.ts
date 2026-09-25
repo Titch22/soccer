@@ -14,6 +14,21 @@ export const BALL_RADIUS = 8;
 export const PLAYER_MAX_SPEED = 150;
 export const PLAYER_SPRINT_MAX_SPEED = 230;
 export const PLAYER_ACCELERATION = 1400;
+// Defensive stance (hold LT/L2): slow walk; tapping strafe on top of it is a short dash.
+export const DEFEND_MAX_SPEED = 90;
+// A strafe is a short committed dash: STRAFE_DASH_SPEED * STRAFE_DASH_DURATION_MS
+// = about 36px, in the direction held when the strafe button was tapped.
+export const STRAFE_DASH_SPEED = 300;
+export const STRAFE_DASH_DURATION_MS = 120;
+// Strafes work like charges: you can chain STRAFE_MAX_CHARGES back to back (one
+// tap each), then each spent charge comes back one at a time after this long.
+export const STRAFE_MAX_CHARGES = 2;
+export const STRAFE_RECHARGE_MS = 1200;
+export const STRAFE_STAMINA_COST = 20;
+// Hitbox radius multipliers (plain circles - facing is deliberately ignored):
+// standing in defensive stance, and the bigger one during a strafe dash.
+export const DEFEND_HITBOX_SCALE = 1.4;
+export const STRAFE_HITBOX_SCALE = 1.7;
 export const PLAYER_FRICTION = 900;
 // Inertia: effective acceleration is scaled by this factor when the desired
 // direction opposes current velocity (1.0 = full accel when aligned/starting

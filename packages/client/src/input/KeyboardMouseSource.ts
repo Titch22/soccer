@@ -64,6 +64,8 @@ export class KeyboardMouseSource {
     const passHeld = this.keys.has("Space");
     const tacklePressed = this.keys.has("ControlLeft") || this.keys.has("KeyC");
     const tapHeld = this.keys.has("KeyQ");
+    const defendHeld = this.keys.has("KeyF");
+    const strafeHeld = this.keys.has("KeyE");
 
     return {
       moveVector: { x: x / len, y: y / len },
@@ -73,6 +75,8 @@ export class KeyboardMouseSource {
       passHeld,
       tacklePressed,
       tapHeld,
+      defendHeld,
+      strafeHeld,
     };
   }
 }

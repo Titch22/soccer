@@ -20,5 +20,7 @@ export function computeAiInput(seq: number, tick: number, self: PlayerState, bal
     shootHeld: false,
     tacklePressed: dist < TACKLE_RANGE && ball.possessedByPlayerId !== self.id,
     tapHeld: false,
+    defendHeld: false,
+    strafeHeld: false,
   };
 }

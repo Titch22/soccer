@@ -68,6 +68,9 @@ async function main() {
   const playerViews = new Map<string, PlayerView>();
 
   const staminaBar = createStaminaBarView();
+  // HUD element: always drawn above the pitch and players.
+  app.stage.sortableChildren = true;
+  staminaBar.container.zIndex = 1000;
   app.stage.addChild(staminaBar.container);
 
   const ballInteractIndicator = createBallInteractIndicatorView();
@@ -166,6 +169,8 @@ async function main() {
           possessing: state.ball.possessedByPlayerId === player.id,
           tackling: player.possessionState === "tackling",
           stunned: player.possessionState === "stunned",
+          defending: player.isDefending,
+          strafing: player.isStrafing,
           velocityAngle: Math.atan2(player.velocity.y, player.velocity.x),
           speed: Math.hypot(player.velocity.x, player.velocity.y),
         },
@@ -198,7 +203,7 @@ async function main() {
         }
 
         staminaBar.setVisible(true);
-        staminaBar.setPosition(screen.x, screen.y);
+        staminaBar.setScreenSize(app.screen.width, app.screen.height);
         staminaBar.setStamina(player.stamina / STAMINA_MAX);
       } else {
         view.setPassAim(false, 0, 0);

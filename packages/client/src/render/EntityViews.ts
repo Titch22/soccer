@@ -1,4 +1,4 @@
-import { BALL_RADIUS, PLAYER_RADIUS } from "@rematch/shared";
+import { BALL_RADIUS, DEFEND_HITBOX_SCALE, PLAYER_RADIUS, STRAFE_HITBOX_SCALE } from "@rematch/shared";
 import { Container, Graphics } from "pixi.js";
 
 const PASS_AIM_LINE_MIN_LENGTH = 34;
@@ -23,9 +23,9 @@ const SPRINT_TRAIL_MIN_SPEED = 20;
 const BALL_INDICATOR_RADIUS = BALL_RADIUS + 11;
 const BALL_INDICATOR_COLOR = 0xffffff;
 
-const STAMINA_BAR_WIDTH = 34;
-const STAMINA_BAR_HEIGHT = 5;
-const STAMINA_BAR_Y_OFFSET = PLAYER_RADIUS + 12;
+const STAMINA_BAR_WIDTH = 300;
+const STAMINA_BAR_HEIGHT = 18;
+const STAMINA_BAR_BOTTOM_MARGIN = 28;
 
 function staminaColor(ratio: number): number {
   // Green when full, fading through amber to red as it depletes.
@@ -62,6 +62,9 @@ export interface PlayerStatus {
   possessing: boolean;
   tackling: boolean;
   stunned: boolean;
+  /** Defensive stance active / strafing (bigger hitbox). */
+  defending: boolean;
+  strafing: boolean;
   /** World-space movement direction (radians) and speed, used for the sprint/tackle streaks. */
   velocityAngle: number;
   speed: number;
@@ -123,6 +126,17 @@ export function createPlayerView(color: number, isSelf: boolean): PlayerView {
     .stroke({ width: 3, color: lighten(color, 0.6) });
   possessionRing.visible = false;
 
+  // Defensive stance: a bracket in front of the player (rotates with facing).
+  const stanceArc = new Graphics()
+    .arc(0, 0, PLAYER_RADIUS + 9, -Math.PI / 3, Math.PI / 3)
+    .stroke({ width: 4, color: 0xffffff, alpha: 0.9, cap: "round" });
+  stanceArc.visible = false;
+  // Defending / strafing: outline of the enlarged hitbox (scaled per status) (a plain circle, facing-independent).
+  const hitboxRing = new Graphics()
+    .circle(0, 0, PLAYER_RADIUS)
+    .stroke({ width: 1.5, color: 0xffffff, alpha: 0.6 });
+  hitboxRing.visible = false;
+
   const tackleFlash = new Graphics().circle(0, 0, PLAYER_RADIUS).fill({ color: 0xffffff, alpha: 0.7 });
   tackleFlash.visible = false;
 
@@ -137,7 +151,7 @@ export function createPlayerView(color: number, isSelf: boolean): PlayerView {
   passAimLine.visible = false;
   const shootPowerLine = new Graphics();
   shootPowerLine.visible = false;
-  container.addChild(trail, body, facingLine, possessionRing, tackleFlash, stunDots, passAimLine, shootPowerLine);
+  container.addChild(trail, hitboxRing, body, facingLine, possessionRing, stanceArc, tackleFlash, stunDots, passAimLine, shootPowerLine);
 
   return {
     container,
@@ -146,6 +160,11 @@ export function createPlayerView(color: number, isSelf: boolean): PlayerView {
     },
     setStatus(status: PlayerStatus, nowMs: number) {
       possessionRing.visible = status.possessing && !status.stunned;
+      stanceArc.visible = status.defending && !status.stunned;
+      const hitboxScale = status.strafing ? STRAFE_HITBOX_SCALE : status.defending ? DEFEND_HITBOX_SCALE : 1;
+      hitboxRing.visible = hitboxScale > 1;
+      hitboxRing.scale.set(hitboxScale);
+      // The ring is drawn in local space, so keep it un-rotated (a circle either way).
 
       // Stunned: gray and blinking, with orbiting dots.
       body.tint = status.stunned ? STUN_BODY_TINT : 0xffffff;
@@ -154,7 +173,7 @@ export function createPlayerView(color: number, isSelf: boolean): PlayerView {
       if (status.stunned) stunDots.rotation = nowMs / 180 - container.rotation;
 
       // Tackling: body stretched forward plus a white flash.
-      body.scale.set(status.tackling ? 1.35 : 1, status.tackling ? 0.8 : 1);
+      body.scale.set(status.tackling ? 1.35 : hitboxScale, status.tackling ? 0.8 : hitboxScale);
       tackleFlash.visible = status.tackling;
       tackleFlash.scale.set(status.tackling ? 1.35 : 1, status.tackling ? 0.8 : 1);
 
@@ -264,20 +283,21 @@ export function createBallInteractIndicatorView(): BallInteractIndicatorView {
 export interface StaminaBarView {
   container: Container;
   setVisible(visible: boolean): void;
-  /** Position this above a specific player's current screen position. */
-  setPosition(x: number, y: number): void;
+  /** Pins the bar to the bottom centre of a screen of the given size (call on resize / every frame). */
+  setScreenSize(screenWidth: number, screenHeight: number): void;
   setStamina(ratio: number): void;
 }
 
 /**
- * Local-only endurance bar, floated above the local player's head. Never
+ * Local-only endurance bar, fixed at the bottom centre of the screen. Never
  * instantiate or show one for another client's player.
  */
 export function createStaminaBarView(): StaminaBarView {
   const container = new Container();
   const background = new Graphics()
-    .roundRect(-STAMINA_BAR_WIDTH / 2, 0, STAMINA_BAR_WIDTH, STAMINA_BAR_HEIGHT, 2)
-    .fill({ color: 0x000000, alpha: 0.55 });
+    .roundRect(-STAMINA_BAR_WIDTH / 2, 0, STAMINA_BAR_WIDTH, STAMINA_BAR_HEIGHT, 6)
+    .fill({ color: 0x000000, alpha: 0.6 })
+    .stroke({ width: 2, color: 0xffffff, alpha: 0.85 });
   const fill = new Graphics();
   container.addChild(background, fill);
   container.visible = false;
@@ -287,14 +307,17 @@ export function createStaminaBarView(): StaminaBarView {
     setVisible(visible: boolean) {
       container.visible = visible;
     },
-    setPosition(x: number, y: number) {
-      container.position.set(x, y - STAMINA_BAR_Y_OFFSET);
+    setScreenSize(screenWidth: number, screenHeight: number) {
+      container.position.set(screenWidth / 2, screenHeight - STAMINA_BAR_HEIGHT - STAMINA_BAR_BOTTOM_MARGIN);
     },
     setStamina(ratio: number) {
       const clamped = Math.max(0, Math.min(1, ratio));
+      const inset = 3;
+      const innerWidth = (STAMINA_BAR_WIDTH - inset * 2) * clamped;
+      fill.clear();
+      if (innerWidth <= 0) return;
       fill
-        .clear()
-        .roundRect(-STAMINA_BAR_WIDTH / 2, 0, STAMINA_BAR_WIDTH * clamped, STAMINA_BAR_HEIGHT, 2)
+        .roundRect(-STAMINA_BAR_WIDTH / 2 + inset, inset, innerWidth, STAMINA_BAR_HEIGHT - inset * 2, 4)
         .fill({ color: staminaColor(clamped) });
     },
   };

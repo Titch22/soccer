@@ -18,6 +18,18 @@ export interface PlayerState {
   velocity: Vector2;
   facing: number;
   isSprinting: boolean;
+  /** Defensive stance active (visible to everyone). */
+  isDefending: boolean;
+  /** Mid strafe dash (bigger hitbox). */
+  isStrafing: boolean;
+  /** Remaining time of the current strafe dash (0 = not dashing), its direction, and the charge system (see STRAFE_MAX_CHARGES). */
+  strafeMs: number;
+  strafeDir: Vector2;
+  strafeCharges: number;
+  /** Time until the next spent strafe charge comes back (0 when full). */
+  strafeRechargeMs: number;
+  /** Last tick's strafeHeld, for tap (rising-edge) detection. */
+  prevStrafeHeld: boolean;
   /** 0..STAMINA_MAX. Sprinting drains it; it regenerates while not sprinting. */
   stamina: number;
   possessionState: PossessionState;
@@ -76,4 +88,8 @@ export interface InputCommand {
   tacklePressed: boolean;
   /** True while a tap is requested (right-stick flick / Q key); the tap goes along aimVector when aimActive. */
   tapHeld: boolean;
+  /** Defensive stance button (LT/L2) held. */
+  defendHeld: boolean;
+  /** Strafe button (A/Cross) held; a tap while defending dashes along moveVector. */
+  strafeHeld: boolean;
 }

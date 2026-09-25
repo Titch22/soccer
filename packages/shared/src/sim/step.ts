@@ -49,7 +49,7 @@ export function simulateTick(
     const input = inputsByPlayer.get(player.id);
     updateQueuedBallAction(player, next.ball, input, dtMs);
     const moveInput = resolveBallActionApproach(player, next.ball, input);
-    Object.assign(player, applyPlayerMovement(player, moveInput, dtMs));
+    Object.assign(player, applyPlayerMovement(player, moveInput, dtMs, next.ball.position));
   }
 
   const playerList = Object.values(next.players);

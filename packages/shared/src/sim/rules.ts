@@ -1,4 +1,4 @@
-import { GOAL_BOTTOM, GOAL_TOP, PITCH_HEIGHT, PITCH_WIDTH, STAMINA_MAX } from "./constants";
+import { GOAL_BOTTOM, GOAL_TOP, PITCH_HEIGHT, PITCH_WIDTH, STAMINA_MAX, STRAFE_MAX_CHARGES } from "./constants";
 import type { MatchState, PlayerState } from "./types";
 
 export function checkGoal(state: MatchState): "A" | "B" | null {
@@ -27,6 +27,9 @@ export function resetForKickoff(state: MatchState): void {
     player.shootChargeMs = 0;
     player.tackleCooldownMs = 0;
     player.tapQueuedMs = 0;
+    player.strafeMs = 0;
+    player.strafeCharges = STRAFE_MAX_CHARGES;
+    player.strafeRechargeMs = 0;
     player.stamina = STAMINA_MAX;
   });
   teamBPlayers.forEach((player, i) => {
@@ -37,6 +40,9 @@ export function resetForKickoff(state: MatchState): void {
     player.shootChargeMs = 0;
     player.tackleCooldownMs = 0;
     player.tapQueuedMs = 0;
+    player.strafeMs = 0;
+    player.strafeCharges = STRAFE_MAX_CHARGES;
+    player.strafeRechargeMs = 0;
     player.stamina = STAMINA_MAX;
   });
 }
@@ -62,6 +68,9 @@ export function placeLateJoinSpawn(state: MatchState, player: PlayerState): void
   player.shootChargeMs = 0;
   player.tackleCooldownMs = 0;
   player.tapQueuedMs = 0;
+  player.strafeMs = 0;
+  player.strafeCharges = STRAFE_MAX_CHARGES;
+  player.strafeRechargeMs = 0;
   player.stamina = STAMINA_MAX;
 }
 

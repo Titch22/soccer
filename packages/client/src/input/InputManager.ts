@@ -99,6 +99,8 @@ export class InputManager {
     const sprint = gamepadInput?.sprint ?? kbInput?.sprint ?? false;
     const shootHeld = gamepadInput?.shootHeld ?? kbInput?.shootHeld ?? false;
     const tacklePressed = gamepadInput?.tacklePressed ?? kbInput?.tacklePressed ?? false;
+    const defendHeld = gamepadInput?.defendHeld ?? kbInput?.defendHeld ?? false;
+    const strafeHeld = gamepadInput?.strafeHeld ?? kbInput?.strafeHeld ?? false;
     const tapHeld = flicking || (kbInput?.tapHeld ?? false);
 
     this.seq += 1;
@@ -113,6 +115,8 @@ export class InputManager {
       shootHeld,
       tacklePressed,
       tapHeld,
+      defendHeld,
+      strafeHeld,
     };
   }
 }
