@@ -35,7 +35,7 @@ importers:
 
   packages/client:
     dependencies:
-      '@rematch/shared':
+      '@soccer/shared':
         specifier: workspace:*
         version: link:../shared
       colyseus.js:
@@ -60,7 +60,7 @@ importers:
       '@colyseus/ws-transport':
         specifier: ^0.16.5
         version: 0.16.5(@colyseus/core@0.16.26(@colyseus/schema@3.0.76)(@pm2/io@6.1.0))
-      '@rematch/shared':
+      '@soccer/shared':
         specifier: workspace:*
         version: link:../shared
       colyseus:

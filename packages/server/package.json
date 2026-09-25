@@ -1,5 +1,5 @@
 {
-  "name": "@rematch/server",
+  "name": "@soccer/server",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -12,7 +12,7 @@
   "dependencies": {
     "@colyseus/schema": "^3.0.0",
     "@colyseus/ws-transport": "^0.16.5",
-    "@rematch/shared": "workspace:*",
+    "@soccer/shared": "workspace:*",
     "colyseus": "^0.16.5"
   },
   "devDependencies": {

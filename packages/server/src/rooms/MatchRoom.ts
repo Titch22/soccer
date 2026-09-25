@@ -10,7 +10,7 @@ import {
   TICK_DURATION_MS,
   type InputCommand,
   type MatchState,
-} from "@rematch/shared";
+} from "@soccer/shared";
 
 const MIN_PLAYERS_TO_START = Number(process.env.MIN_PLAYERS_TO_START ?? DEFAULT_MIN_PLAYERS_TO_START);
 const RECONNECTION_GRACE_SECONDS = 20;

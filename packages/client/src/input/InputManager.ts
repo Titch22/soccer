@@ -1,4 +1,4 @@
-import type { InputCommand } from "@rematch/shared";
+import type { InputCommand } from "@soccer/shared";
 import { GamepadSource } from "./GamepadSource";
 import { KeyboardMouseSource } from "./KeyboardMouseSource";
 

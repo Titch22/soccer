@@ -1,4 +1,4 @@
-# Deploying Rematch Web
+# Deploying Soccer Web
 
 Client = static files, server = one Node process (HTTP + WebSocket on one port), nginx in front.
 
@@ -17,7 +17,7 @@ Override at build time with `VITE_SERVER_URL=wss://ws.example.com pnpm build` (e
 3. Check: `curl http://127.0.0.1:2567/health`.
 
 ## nginx
-1. Copy `packages/client/dist/*` to `/var/www/rematch`.
+1. Copy `packages/client/dist/*` to `/var/www/soccer`.
 2. Adapt `deploy/nginx.conf` (server_name), enable it, run certbot, `nginx -s reload`.
 
 ## Notes

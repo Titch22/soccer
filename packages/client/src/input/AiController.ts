@@ -1,4 +1,4 @@
-import { distance, normalize, sub, type BallState, type InputCommand, type PlayerState } from "@rematch/shared";
+import { distance, normalize, sub, type BallState, type InputCommand, type PlayerState } from "@soccer/shared";
 
 const TACKLE_RANGE = 45;
 const SPRINT_RANGE = 150;

@@ -1,4 +1,4 @@
-import { PITCH_HEIGHT, PITCH_WIDTH, GOAL_WIDTH } from "@rematch/shared";
+import { PITCH_HEIGHT, PITCH_WIDTH, GOAL_WIDTH } from "@soccer/shared";
 import { Container, Graphics } from "pixi.js";
 
 export function createPitchView(): Container {

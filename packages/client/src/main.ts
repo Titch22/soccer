@@ -11,7 +11,7 @@ import {
   TICK_DURATION_MS,
   type InputCommand,
   type MatchState,
-} from "@rematch/shared";
+} from "@soccer/shared";
 import {
   createBallInteractIndicatorView,
   createBallView,

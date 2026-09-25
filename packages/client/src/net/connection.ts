@@ -1,4 +1,4 @@
-import type { InputCommand, MatchState } from "@rematch/shared";
+import type { InputCommand, MatchState } from "@soccer/shared";
 import { Client, Room } from "colyseus.js";
 
 export type ConnectionStatus = "connected" | "reconnecting" | "disconnected";

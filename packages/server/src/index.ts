@@ -23,7 +23,7 @@ const gameServer = new Server({
 gameServer.define("match", MatchRoom);
 
 httpServer.listen(port, host, () => {
-  console.log(`[server] rematch-web server listening on ${host}:${port}`);
+  console.log(`[server] soccer-web server listening on ${host}:${port}`);
 });
 
 async function shutdown(signal: string) {
