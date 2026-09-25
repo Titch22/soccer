@@ -13,7 +13,6 @@ export class InputManager {
   private readonly gamepad: GamepadSource;
   private readonly keyboardMouse: KeyboardMouseSource | null;
   private seq = 0;
-  private chargeStartedAt: number | null = null;
   private lastAimVector = { x: 1, y: 0 };
 
   constructor(options: InputManagerOptions) {
@@ -32,29 +31,31 @@ export class InputManager {
   }
 
   sample(tick: number, playerScreenX: number, playerScreenY: number): InputCommand {
-    const useGamepad = this.gamepad.hasActivity();
-    const gamepadInput = useGamepad ? this.gamepad.read() : null;
-    const kbInput = this.keyboardMouse?.read(playerScreenX, playerScreenY) ?? null;
+    // Once a controller is connected for this client, keyboard/mouse is
+    // completely ignored - no per-field fallback, no mixing sources.
+    const gamepadConnected = this.gamepad.isConnected();
+    const gamepadInput = gamepadConnected ? this.gamepad.read() : null;
+    const kbInput = gamepadConnected ? null : (this.keyboardMouse?.read(playerScreenX, playerScreenY) ?? null);
 
-    const moveVector = gamepadInput?.moveVector ?? kbInput?.moveVector ?? { x: 0, y: 0 };
-    const aimVector = gamepadInput?.aimVector ?? kbInput?.aimVector ?? null;
-    if (aimVector && Math.hypot(aimVector.x, aimVector.y) > 1e-3) this.lastAimVector = aimVector;
+    const passHeld = gamepadInput?.passHeld ?? kbInput?.passHeld ?? false;
+
+    // Charging a pass locks movement server-side; on gamepad, re-purpose the
+    // now-idle left stick as the aim control instead of the right stick.
+    const rawMoveVector = gamepadInput?.moveVector ?? kbInput?.moveVector ?? { x: 0, y: 0 };
+    const deviceAimVector =
+      passHeld && gamepadInput
+        ? gamepadInput.moveVector
+        : (gamepadInput?.aimVector ?? kbInput?.aimVector ?? null);
+    const aimActive = deviceAimVector !== null && Math.hypot(deviceAimVector.x, deviceAimVector.y) > 1e-3;
+    if (aimActive) {
+      this.lastAimVector = deviceAimVector;
+    }
+    const moveVector = passHeld ? { x: 0, y: 0 } : rawMoveVector;
 
     const sprint = gamepadInput?.sprint ?? kbInput?.sprint ?? false;
-    const shootHeld = gamepadInput?.shootPressed ?? kbInput?.shootPressed ?? false;
-    const passPressed = gamepadInput?.passPressed ?? kbInput?.passPressed ?? false;
+    const shootHeld = gamepadInput?.shootHeld ?? kbInput?.shootHeld ?? false;
     const tacklePressed = gamepadInput?.tacklePressed ?? kbInput?.tacklePressed ?? false;
-
-    const now = performance.now();
-    let shootChargeMs = 0;
-    let shootPressed = false;
-    if (shootHeld) {
-      if (this.chargeStartedAt === null) this.chargeStartedAt = now;
-    } else if (this.chargeStartedAt !== null) {
-      shootChargeMs = now - this.chargeStartedAt;
-      shootPressed = true;
-      this.chargeStartedAt = null;
-    }
+    const tapHeld = gamepadInput?.tapHeld ?? kbInput?.tapHeld ?? false;
 
     this.seq += 1;
     return {
@@ -62,11 +63,12 @@ export class InputManager {
       tick,
       moveVector,
       aimVector: this.lastAimVector,
+      aimActive,
       sprint,
-      passPressed,
-      shootPressed,
-      shootChargeMs,
+      passHeld,
+      shootHeld,
       tacklePressed,
+      tapHeld,
     };
   }
 }

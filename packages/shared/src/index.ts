@@ -4,3 +4,4 @@ export * from "./sim/vec";
 export * from "./sim/step";
 export * from "./sim/factory";
 export * from "./sim/rules";
+export { computeSwungAimDirection, resolveShootBaseAim } from "./sim/ballControl";

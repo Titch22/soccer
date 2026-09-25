@@ -1,4 +1,4 @@
-import { MATCH_DURATION_MS, PITCH_HEIGHT, PITCH_WIDTH } from "./constants";
+import { MATCH_DURATION_MS, PITCH_HEIGHT, PITCH_WIDTH, STAMINA_MAX } from "./constants";
 import { resetForKickoff } from "./rules";
 import type { MatchState, PlayerState } from "./types";
 
@@ -10,8 +10,12 @@ export function createPlayer(id: string, teamId: "A" | "B"): PlayerState {
     velocity: { x: 0, y: 0 },
     facing: teamId === "A" ? 0 : Math.PI,
     isSprinting: false,
+    stamina: STAMINA_MAX,
     possessionState: "none",
     possessionTimer: 0,
+    passChargeMs: 0,
+    shootChargeMs: 0,
+    tapChargeMs: 0,
     lastInputSeq: 0,
   };
 }
@@ -48,10 +52,11 @@ export function createEmptyInputCommand(seq: number, tick: number) {
     tick,
     moveVector: { x: 0, y: 0 },
     aimVector: { x: 1, y: 0 },
+    aimActive: false,
     sprint: false,
-    passPressed: false,
-    shootPressed: false,
-    shootChargeMs: 0,
+    passHeld: false,
+    shootHeld: false,
     tacklePressed: false,
+    tapHeld: false,
   };
 }

@@ -3,8 +3,6 @@ export class KeyboardMouseSource {
   private mouseX = 0;
   private mouseY = 0;
   private mouseDown = false;
-  private tackleKeyDown = false;
-  private passKeyDown = false;
 
   constructor(private readonly target: HTMLElement) {
     window.addEventListener("keydown", this.onKeyDown);
@@ -24,8 +22,6 @@ export class KeyboardMouseSource {
 
   private onKeyDown = (e: KeyboardEvent) => {
     this.keys.add(e.code);
-    if (e.code === "Space") this.passKeyDown = true;
-    if (e.code === "ControlLeft" || e.code === "KeyC") this.tackleKeyDown = true;
   };
 
   private onKeyUp = (e: KeyboardEvent) => {
@@ -64,19 +60,19 @@ export class KeyboardMouseSource {
     const aimLen = Math.hypot(aimDx, aimDy) || 1;
 
     const sprint = this.keys.has("ShiftLeft") || this.keys.has("ShiftRight");
-    const shootPressed = this.mouseDown;
-    const passPressed = this.passKeyDown;
-    const tacklePressed = this.tackleKeyDown;
-    this.passKeyDown = false;
-    this.tackleKeyDown = false;
+    const shootHeld = this.mouseDown;
+    const passHeld = this.keys.has("Space");
+    const tacklePressed = this.keys.has("ControlLeft") || this.keys.has("KeyC");
+    const tapHeld = this.keys.has("KeyQ");
 
     return {
       moveVector: { x: x / len, y: y / len },
       aimVector: { x: aimDx / aimLen, y: aimDy / aimLen },
       sprint,
-      shootPressed,
-      passPressed,
+      shootHeld,
+      passHeld,
       tacklePressed,
+      tapHeld,
     };
   }
 }

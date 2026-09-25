@@ -3,9 +3,13 @@ import {
   PLAYER_FRICTION,
   PLAYER_MAX_SPEED,
   PLAYER_SPRINT_MAX_SPEED,
+  PLAYER_TURN_ACCEL_FACTOR_MIN,
+  STAMINA_DRAIN_PER_SECOND,
+  STAMINA_MAX,
+  STAMINA_REGEN_PER_SECOND,
 } from "./constants";
 import type { InputCommand, PlayerState } from "./types";
-import { add, clampLength, length, normalize, scale } from "./vec";
+import { add, clampLength, dot, length, normalize, scale } from "./vec";
 
 const dtSeconds = (dtMs: number) => dtMs / 1000;
 
@@ -15,14 +19,44 @@ export function applyPlayerMovement(
   dtMs: number,
 ): PlayerState {
   const dt = dtSeconds(dtMs);
+
+  // Charging a pass or a tap locks out steering: no acceleration/deceleration
+  // from input, so the player just carries their current velocity forward
+  // unchanged. For a pass, facing is driven by the aim stick instead (see
+  // applyBallControl); for a tap, facing simply stays frozen at whatever it
+  // was the instant the charge started, since a tap fires along that locked
+  // direction rather than a live aim.
+  const isChargingOrStartingToCharge =
+    player.possessionState === "chargingPass" ||
+    player.possessionState === "chargingTap" ||
+    (player.possessionState === "dribbling" && ((input?.passHeld ?? false) || (input?.tapHeld ?? false)));
+
+  if (isChargingOrStartingToCharge) {
+    const position = add(player.position, scale(player.velocity, dt));
+    return {
+      ...player,
+      position,
+      lastInputSeq: input?.seq ?? player.lastInputSeq,
+    };
+  }
+
   const moveVector = input ? clampLength(input.moveVector, 1) : { x: 0, y: 0 };
-  const isSprinting = input?.sprint ?? false;
+  const isMoving = length(moveVector) > 1e-3;
+  const wantsSprint = input?.sprint ?? false;
+  const isSprinting = wantsSprint && isMoving && player.stamina > 0;
   const maxSpeed = isSprinting ? PLAYER_SPRINT_MAX_SPEED : PLAYER_MAX_SPEED;
 
   let velocity = player.velocity;
 
-  if (length(moveVector) > 1e-3) {
-    velocity = add(velocity, scale(moveVector, PLAYER_ACCELERATION * dt));
+  if (isMoving) {
+    // Inertia: accelerating roughly the way you're already moving is fast,
+    // but fighting your own momentum to reverse/sharply turn is slower -
+    // you can't flip direction instantly, you have to fight through it.
+    const speed = length(velocity);
+    const velocityDir = speed > 1 ? scale(velocity, 1 / speed) : moveVector;
+    const alignment = dot(velocityDir, moveVector);
+    const turnFactor = PLAYER_TURN_ACCEL_FACTOR_MIN + (1 - PLAYER_TURN_ACCEL_FACTOR_MIN) * ((alignment + 1) / 2);
+    velocity = add(velocity, scale(moveVector, PLAYER_ACCELERATION * turnFactor * dt));
     velocity = clampLength(velocity, maxSpeed);
   } else {
     const speed = length(velocity);
@@ -30,8 +64,12 @@ export function applyPlayerMovement(
     velocity = speed <= decel ? { x: 0, y: 0 } : scale(velocity, (speed - decel) / speed);
   }
 
+  const stamina = isSprinting
+    ? Math.max(0, player.stamina - STAMINA_DRAIN_PER_SECOND * dt)
+    : Math.min(STAMINA_MAX, player.stamina + STAMINA_REGEN_PER_SECOND * dt);
+
   const position = add(player.position, scale(velocity, dt));
-  const facing = length(moveVector) > 1e-3 ? Math.atan2(moveVector.y, moveVector.x) : player.facing;
+  const facing = isMoving ? Math.atan2(moveVector.y, moveVector.x) : player.facing;
 
   return {
     ...player,
@@ -39,6 +77,7 @@ export function applyPlayerMovement(
     velocity,
     facing,
     isSprinting,
+    stamina,
     lastInputSeq: input?.seq ?? player.lastInputSeq,
   };
 }

@@ -11,16 +11,36 @@ export const GOAL_BOTTOM = (PITCH_HEIGHT + GOAL_WIDTH) / 2;
 export const PLAYER_RADIUS = 14;
 export const BALL_RADIUS = 8;
 
-export const PLAYER_MAX_SPEED = 220;
-export const PLAYER_SPRINT_MAX_SPEED = 320;
+export const PLAYER_MAX_SPEED = 150;
+export const PLAYER_SPRINT_MAX_SPEED = 230;
 export const PLAYER_ACCELERATION = 1400;
 export const PLAYER_FRICTION = 900;
+// Inertia: effective acceleration is scaled by this factor when the desired
+// direction opposes current velocity (1.0 = full accel when aligned/starting
+// from rest, this value = full accel when trying to instantly reverse).
+export const PLAYER_TURN_ACCEL_FACTOR_MIN = 0.35;
+
+export const STAMINA_MAX = 100;
+// Full sprint drains a full bar in ~2.5s; standing/jogging refills it in ~5s.
+export const STAMINA_DRAIN_PER_SECOND = 40;
+export const STAMINA_REGEN_PER_SECOND = 20;
 
 export const BALL_FRICTION = 140;
 export const BALL_RESTITUTION = 0.6;
 export const PLAYER_BALL_RESTITUTION = 0.4;
 
 export const DRIBBLE_RADIUS = PLAYER_RADIUS + BALL_RADIUS + 10;
+// Wider than DRIBBLE_RADIUS on purpose: the "you can act on the ball"
+// indicator should give advance warning before the tighter auto-pickup
+// radius actually grabs it, not fire at the exact same instant possession
+// is taken.
+export const BALL_INTERACT_INDICATOR_RADIUS = DRIBBLE_RADIUS + 25;
+// When a loose ball has multiple eligible players in range, priority isn't
+// pure distance: this converts px/s of "closing speed" (how fast a
+// player+ball are approaching each other) into an equivalent px of distance
+// advantage, so someone actively closing in beats someone merely standing
+// closer but not moving toward it.
+export const PICKUP_CLOSING_SPEED_WEIGHT = 0.05;
 export const DRIBBLE_OFFSET = PLAYER_RADIUS + BALL_RADIUS * 0.4;
 export const DRIBBLE_OFFSET_SPRINT = PLAYER_RADIUS + BALL_RADIUS * 1.6;
 // Max px/s the ball's position is allowed to catch up toward its dribble
@@ -31,15 +51,50 @@ export const DRIBBLE_CORRECTION_SPEED_SPRINT = 350;
 
 export const PASS_ASSIST_CONE_RADIANS = Math.PI / 6;
 export const PASS_ASSIST_MAX_DISTANCE = 400;
-export const PASS_BASE_SPEED = 380;
+export const PASS_BASE_SPEED = 260;
+// Holding the pass button locks movement and lets you aim; releasing (or
+// hitting this timeout) fires the pass, whichever comes first.
+export const PASS_CHARGE_MAX_MS = 1000;
 
 export const SHOOT_MIN_SPEED = 300;
 export const SHOOT_MAX_SPEED = 620;
 export const SHOOT_MAX_CHARGE_MS = 900;
+// Charge time below this stays perfectly accurate (a quick tap-shot); past
+// it, aim starts to wobble - see computeSwungAimDirection in ballControl.ts.
+export const SHOOT_SWAY_FREE_WINDOW_MS = 150;
+export const SHOOT_SWAY_MAX_RADIANS = Math.PI / 5;
+export const SHOOT_SWAY_PERIOD_MS = 420;
+// When the aim stick/mouse isn't actively providing a direction, shooting
+// defaults to the player's current running direction instead of a stale
+// remembered aim - but only once they're moving fast enough for that
+// direction to be meaningful.
+export const SHOOT_RUNNING_AIM_MIN_SPEED = 20;
 
 // How long a player who just shot/passed is blocked from immediately
 // re-claiming dribble possession of the same ball.
 export const RELEASE_LOCK_DURATION_MS = 300;
+
+// Quick "tap the ball forward" touch - a mini pass: holding the button locks
+// the player's current direction (like a pass charge) and releasing (or
+// hitting this much shorter timeout) fires the tap along that locked
+// direction. Speed is derived so the ball's friction deceleration
+// (distance = v^2 / 2a) brings it to rest right around
+// BALL_INTERACT_INDICATOR_RADIUS away, not an arbitrary distance - continuing
+// to run the same direction should put the "you can act on it" indicator
+// back on screen almost immediately.
+export const TAP_SPEED = Math.sqrt(2 * BALL_FRICTION * BALL_INTERACT_INDICATOR_RADIUS);
+export const TAP_CHARGE_MAX_MS = 200;
+// Derived, not guessed: the time for the tapped ball to travel past
+// DRIBBLE_RADIUS under friction deceleration (d = v0*t - 1/2*a*t^2, solved
+// for the first t where d = DRIBBLE_RADIUS), plus a small safety margin for
+// tick quantization. Short compared to RELEASE_LOCK_DURATION_MS - just long
+// enough that even a player who doesn't chase at all can't reattach before
+// the ball has actually separated, so tapping doesn't collapse into "the
+// ball stays glued to your feet" - but still much quicker to reclaim than a
+// pass or shot.
+export const TAP_RELEASE_LOCK_DURATION_MS =
+  ((TAP_SPEED - Math.sqrt(TAP_SPEED * TAP_SPEED - 2 * BALL_FRICTION * DRIBBLE_RADIUS)) / BALL_FRICTION) * 1000 +
+  50;
 
 export const TACKLE_RANGE = PLAYER_RADIUS * 2 + 6;
 export const TACKLE_LUNGE_SPEED = 420;

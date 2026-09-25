@@ -39,20 +39,21 @@ export class GamepadSource {
     const moveLen = Math.hypot(moveX, moveY) || 1;
     const aimLen = Math.hypot(aimX, aimY);
 
-    const sprint = (pad.buttons[10]?.pressed ?? false) || (pad.buttons[7]?.value ?? 0) > 0.5;
-    const shootPressed = pad.buttons[0]?.pressed ?? false;
-    const shootChargeMs = (pad.buttons[0]?.value ?? 0) > 0 ? 1 : 0;
-    const passPressed = pad.buttons[2]?.pressed ?? false;
+    // Standard gamepad mapping: 0 = A/Cross, 1 = B/Circle, 2 = X/Square, 4 = LB/L1, 7 = RT/R2.
+    const sprint = pad.buttons[4]?.pressed ?? false;
+    const shootHeld = pad.buttons[7]?.pressed ?? false;
+    const passHeld = pad.buttons[2]?.pressed ?? false;
     const tacklePressed = pad.buttons[1]?.pressed ?? false;
+    const tapHeld = pad.buttons[0]?.pressed ?? false;
 
     return {
       moveVector: { x: moveX / moveLen, y: moveY / moveLen },
       aimVector: aimLen > DEADZONE ? { x: aimX / aimLen, y: aimY / aimLen } : null,
       sprint,
-      shootPressed,
-      shootChargeMs,
-      passPressed,
+      shootHeld,
+      passHeld,
       tacklePressed,
+      tapHeld,
     };
   }
 }

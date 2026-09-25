@@ -14,10 +14,11 @@ export function computeAiInput(seq: number, tick: number, self: PlayerState, bal
     tick,
     moveVector,
     aimVector: dist > 1 ? moveVector : { x: -1, y: 0 },
+    aimActive: dist > 1,
     sprint: dist > SPRINT_RANGE,
-    passPressed: false,
-    shootPressed: false,
-    shootChargeMs: 0,
+    passHeld: false,
+    shootHeld: false,
     tacklePressed: dist < TACKLE_RANGE && ball.possessedByPlayerId !== self.id,
+    tapHeld: false,
   };
 }

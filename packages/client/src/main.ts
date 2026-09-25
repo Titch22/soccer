@@ -1,15 +1,27 @@
 import {
+  BALL_INTERACT_INDICATOR_RADIUS,
+  computeSwungAimDirection,
   DEFAULT_MIN_PLAYERS_TO_START,
+  distance,
+  PASS_CHARGE_MAX_MS,
+  resolveShootBaseAim,
+  SHOOT_MAX_CHARGE_MS,
+  STAMINA_MAX,
   TICK_DURATION_MS,
   type InputCommand,
   type MatchState,
 } from "@rematch/shared";
-import { createBallView, createPlayerView } from "./render/EntityViews";
+import {
+  createBallInteractIndicatorView,
+  createBallView,
+  createPlayerView,
+  createStaminaBarView,
+  type PlayerView,
+} from "./render/EntityViews";
 import { InputManager } from "./input/InputManager";
 import { NetConnection } from "./net/connection";
 import { createPitchView } from "./render/PitchView";
 import { createPixiApp } from "./render/PixiApp";
-import { Container } from "pixi.js";
 
 const SERVER_URL = "ws://localhost:2567";
 const TEAM_COLORS: Record<"A" | "B", number> = { A: 0x2255ee, B: 0xee3322 };
@@ -48,7 +60,13 @@ async function main() {
   const ballView = createBallView();
   app.stage.addChild(ballView);
 
-  const playerViews = new Map<string, Container>();
+  const playerViews = new Map<string, PlayerView>();
+
+  const staminaBar = createStaminaBarView();
+  app.stage.addChild(staminaBar.container);
+
+  const ballInteractIndicator = createBallInteractIndicatorView();
+  app.stage.addChild(ballInteractIndicator.container);
 
   let viewport = { x: 0, y: 0, scale: 1 };
   function fitStage() {
@@ -95,6 +113,8 @@ async function main() {
   let lastKnownSelfPos = { x: 500, y: 300 };
   let lastKnownScore = { A: 0, B: 0 };
   let goalToastHideAt = 0;
+  let lastSentAimVector = { x: 1, y: 0 };
+  let lastSentAimActive = false;
 
   app.ticker.add(() => {
     const now = performance.now();
@@ -114,6 +134,8 @@ async function main() {
       tick += 1;
       const screen = toScreen(lastKnownSelfPos.x, lastKnownSelfPos.y);
       const command: InputCommand = input.sample(tick, screen.x, screen.y);
+      lastSentAimVector = command.aimVector;
+      lastSentAimActive = command.aimActive;
       net.sendInput(command);
       accumulator -= TICK_DURATION_MS;
     }
@@ -127,23 +149,67 @@ async function main() {
       if (!view) {
         view = createPlayerView(TEAM_COLORS[player.teamId]);
         playerViews.set(player.id, view);
-        app.stage.addChild(view);
+        app.stage.addChild(view.container);
       }
       const screen = toScreen(player.position.x, player.position.y);
-      view.position.set(screen.x, screen.y);
-      view.rotation = player.facing;
-      view.alpha = player.id === selfId ? 1 : 0.85;
+      view.container.position.set(screen.x, screen.y);
+      view.setFacing(player.facing);
+      view.container.alpha = player.id === selfId ? 1 : 0.85;
+
+      // Local-only indicators: never reveal another client's pass charge/aim,
+      // shoot power, or stamina.
+      if (player.id === selfId) {
+        const worldAimAngle = Math.atan2(lastSentAimVector.y, lastSentAimVector.x);
+        view.setPassAim(
+          player.possessionState === "chargingPass",
+          player.passChargeMs / PASS_CHARGE_MAX_MS,
+          worldAimAngle,
+        );
+
+        if (player.possessionState === "chargingShot") {
+          const baseAim = resolveShootBaseAim(
+            player.velocity,
+            player.facing,
+            lastSentAimVector,
+            lastSentAimActive,
+          );
+          const swungAim = computeSwungAimDirection(baseAim, player.shootChargeMs);
+          const swungAngle = Math.atan2(swungAim.y, swungAim.x);
+          view.setShootPower(true, player.shootChargeMs / SHOOT_MAX_CHARGE_MS, swungAngle);
+        } else {
+          view.setShootPower(false, 0, 0);
+        }
+
+        staminaBar.setVisible(true);
+        staminaBar.setPosition(screen.x, screen.y);
+        staminaBar.setStamina(player.stamina / STAMINA_MAX);
+      } else {
+        view.setPassAim(false, 0, 0);
+        view.setShootPower(false, 0, 0);
+      }
     }
 
     for (const [id, view] of playerViews) {
       if (!seenIds.has(id)) {
-        app.stage.removeChild(view);
+        app.stage.removeChild(view.container);
         playerViews.delete(id);
       }
     }
 
     const ballScreen = toScreen(state.ball.position.x, state.ball.position.y);
     ballView.position.set(ballScreen.x, ballScreen.y);
+
+    // Local-only: only show the "you can act on the ball" diamond while the
+    // ball is loose (nobody has possession yet) and close enough to THIS
+    // client's own player - never reveals anything about how close other
+    // players are to it.
+    const selfPlayer = selfId ? state.players[selfId] : undefined;
+    const canInteract =
+      !!selfPlayer &&
+      state.ball.possessedByPlayerId === null &&
+      distance(selfPlayer.position, state.ball.position) < BALL_INTERACT_INDICATOR_RADIUS;
+    ballInteractIndicator.setVisible(canInteract);
+    if (canInteract) ballInteractIndicator.setPosition(ballScreen.x, ballScreen.y);
 
     if (hud) hud.textContent = formatHud(state);
 

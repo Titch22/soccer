@@ -3,7 +3,14 @@ export interface Vector2 {
   y: number;
 }
 
-export type PossessionState = "none" | "dribbling" | "tackling" | "stunned";
+export type PossessionState =
+  | "none"
+  | "dribbling"
+  | "chargingPass"
+  | "chargingShot"
+  | "chargingTap"
+  | "tackling"
+  | "stunned";
 
 export interface PlayerState {
   id: string;
@@ -12,8 +19,16 @@ export interface PlayerState {
   velocity: Vector2;
   facing: number;
   isSprinting: boolean;
+  /** 0..STAMINA_MAX. Sprinting drains it; it regenerates while not sprinting. */
+  stamina: number;
   possessionState: PossessionState;
   possessionTimer: number;
+  /** Elapsed hold time while possessionState is "chargingPass"; 0 otherwise. */
+  passChargeMs: number;
+  /** Elapsed hold time while possessionState is "chargingShot"; 0 otherwise. */
+  shootChargeMs: number;
+  /** Elapsed hold time while possessionState is "chargingTap"; 0 otherwise. */
+  tapChargeMs: number;
   lastInputSeq: number;
 }
 
@@ -43,9 +58,14 @@ export interface InputCommand {
   tick: number;
   moveVector: Vector2;
   aimVector: Vector2;
+  /** False when aimVector is a stale remembered value rather than a live stick/mouse reading this tick. */
+  aimActive: boolean;
   sprint: boolean;
-  passPressed: boolean;
-  shootPressed: boolean;
-  shootChargeMs: number;
+  /** True every tick the pass button/key is currently held down (level, not edge-triggered). */
+  passHeld: boolean;
+  /** True every tick the shoot button/key is currently held down (level, not edge-triggered). */
+  shootHeld: boolean;
   tacklePressed: boolean;
+  /** True every tick the tap-ball button/key is currently held down (level, not edge-triggered). */
+  tapHeld: boolean;
 }

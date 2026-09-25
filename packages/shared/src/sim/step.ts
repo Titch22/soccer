@@ -70,6 +70,10 @@ export function simulateTick(
     };
 
     for (const player of playerList) {
+      // Skip the player who just shot/passed - otherwise the ball can bounce
+      // straight off their own body a tick after release and corrupt the
+      // velocity/direction they just fired it with.
+      if (player.id === next.ball.releaseLockPlayerId) continue;
       resolvePlayerBallCollision(player, next.ball, PLAYER_BALL_RESTITUTION);
     }
     resolveBallBoundaryCollision(next.ball, BALL_RESTITUTION);
