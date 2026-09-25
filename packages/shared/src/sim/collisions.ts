@@ -4,6 +4,7 @@ import {
   PITCH_HEIGHT,
   PITCH_WIDTH,
   DEFEND_HITBOX_SCALE,
+  EXTRA_EFFORT_HITBOX_SCALE,
   PLAYER_RADIUS,
   STRAFE_HITBOX_SCALE,
 } from "./constants";
@@ -14,6 +15,7 @@ import { add, distance, length, normalize, scale, sub } from "./vec";
 export function getPlayerRadius(player: PlayerState): number {
   if (player.isStrafing) return PLAYER_RADIUS * STRAFE_HITBOX_SCALE;
   if (player.isDefending) return PLAYER_RADIUS * DEFEND_HITBOX_SCALE;
+  if (player.extraEffortActive) return PLAYER_RADIUS * EXTRA_EFFORT_HITBOX_SCALE;
   return PLAYER_RADIUS;
 }
 

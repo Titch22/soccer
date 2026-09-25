@@ -6,6 +6,7 @@ import {
   PASS_CHARGE_MAX_MS,
   resolveShootBaseAim,
   SHOOT_MAX_CHARGE_MS,
+  EXTRA_EFFORT_MAX,
   STAMINA_MAX,
   TICK_DURATION_MS,
   type InputCommand,
@@ -171,6 +172,7 @@ async function main() {
           stunned: player.possessionState === "stunned",
           defending: player.isDefending,
           strafing: player.isStrafing,
+          extraEffort: player.extraEffortActive,
           velocityAngle: Math.atan2(player.velocity.y, player.velocity.x),
           speed: Math.hypot(player.velocity.x, player.velocity.y),
         },
@@ -205,6 +207,7 @@ async function main() {
         staminaBar.setVisible(true);
         staminaBar.setScreenSize(app.screen.width, app.screen.height);
         staminaBar.setStamina(player.stamina / STAMINA_MAX);
+        staminaBar.setExtraEffort(player.extraEffort / EXTRA_EFFORT_MAX, player.extraEffortActive);
       } else {
         view.setPassAim(false, 0, 0);
         view.setShootPower(false, 0, 0);

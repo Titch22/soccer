@@ -1,5 +1,10 @@
 import {
   DEFEND_MAX_SPEED,
+  EXTRA_EFFORT_DRAIN_PER_SECOND,
+  EXTRA_EFFORT_FILL_PER_SECOND,
+  EXTRA_EFFORT_MAX,
+  EXTRA_EFFORT_MAX_SPEED,
+  EXTRA_EFFORT_MIN_TO_ACTIVATE,
   PLAYER_ACCELERATION,
   PLAYER_FRICTION,
   PLAYER_MAX_SPEED,
@@ -9,6 +14,7 @@ import {
   STANDING_TACKLE,
   STAMINA_DRAIN_PER_SECOND,
   STAMINA_MAX,
+  SPRINT_DOUBLE_TAP_WINDOW_MS,
   STAMINA_REGEN_PER_SECOND,
   STRAFE_MAX_CHARGES,
   STRAFE_RECHARGE_MS,
@@ -40,6 +46,8 @@ export function applyPlayerMovement(
       isStrafing: false,
       strafeMs: 0,
       prevStrafeHeld: input?.strafeHeld ?? false,
+      extraEffortActive: false,
+      prevSprintHeld: input?.sprint ?? false,
       velocity,
       position: add(player.position, scale(velocity, dt)),
       lastInputSeq: input?.seq ?? player.lastInputSeq,
@@ -61,6 +69,8 @@ export function applyPlayerMovement(
       isStrafing: false,
       strafeMs: 0,
       prevStrafeHeld: input?.strafeHeld ?? false,
+      extraEffortActive: false,
+      prevSprintHeld: input?.sprint ?? false,
       position,
       lastInputSeq: input?.seq ?? player.lastInputSeq,
     };
@@ -106,10 +116,40 @@ export function applyPlayerMovement(
   const isStrafing = strafeMs > 0;
   const remainingStrafeMs = Math.max(0, strafeMs - dtMs);
 
-  const isSprinting = !isDefending && !isStrafing && wantsSprint && isMoving && stamina > 0;
+
+  // Extra effort: double-tap sprint (two presses within the window) to spend the
+  // extra bar on a short, faster boost. Ends when the bar empties, sprint is
+  // released, you stop, or you enter stance / a strafe.
+  const sprintPressed = wantsSprint && !player.prevSprintHeld;
+  let sprintTapTimerMs = Math.max(0, player.sprintTapTimerMs - dtMs);
+  let extraEffort = player.extraEffort;
+  let extraEffortActive = player.extraEffortActive;
+  if (sprintPressed) {
+    if (
+      sprintTapTimerMs > 0 &&
+      !extraEffortActive &&
+      isMoving &&
+      !isDefending &&
+      !isStrafing &&
+      extraEffort >= EXTRA_EFFORT_MIN_TO_ACTIVATE
+    ) {
+      extraEffortActive = true;
+      sprintTapTimerMs = 0;
+    } else {
+      sprintTapTimerMs = SPRINT_DOUBLE_TAP_WINDOW_MS;
+    }
+  }
+  if (extraEffortActive && (!wantsSprint || !isMoving || isDefending || isStrafing || extraEffort <= 0)) {
+    extraEffortActive = false;
+  }
+
+  const isSprinting =
+    extraEffortActive || (!isDefending && !isStrafing && wantsSprint && isMoving && stamina > 0);
   const maxSpeed = isDefending
     ? DEFEND_MAX_SPEED
-    : isSprinting
+    : extraEffortActive
+      ? EXTRA_EFFORT_MAX_SPEED
+      : isSprinting
       ? PLAYER_SPRINT_MAX_SPEED
       : PLAYER_MAX_SPEED;
 
@@ -141,9 +181,14 @@ export function applyPlayerMovement(
     velocity = speed <= decel ? { x: 0, y: 0 } : scale(velocity, (speed - decel) / speed);
   }
 
-  stamina = isSprinting
-    ? Math.max(0, stamina - STAMINA_DRAIN_PER_SECOND * dt)
-    : Math.min(STAMINA_MAX, stamina + STAMINA_REGEN_PER_SECOND * dt);
+  // The boost is paid for from the extra bar only; normal stamina just recovers.
+  stamina =
+    isSprinting && !extraEffortActive
+      ? Math.max(0, stamina - STAMINA_DRAIN_PER_SECOND * dt)
+      : Math.min(STAMINA_MAX, stamina + STAMINA_REGEN_PER_SECOND * dt);
+  extraEffort = extraEffortActive
+    ? Math.max(0, extraEffort - EXTRA_EFFORT_DRAIN_PER_SECOND * dt)
+    : Math.min(EXTRA_EFFORT_MAX, extraEffort + EXTRA_EFFORT_FILL_PER_SECOND * (stamina / STAMINA_MAX) * dt);
 
   const position = add(player.position, scale(velocity, dt));
   // In stance the player always faces the ball; otherwise facing follows the
@@ -162,6 +207,10 @@ export function applyPlayerMovement(
     velocity,
     facing,
     isSprinting,
+    extraEffortActive,
+    extraEffort,
+    prevSprintHeld: wantsSprint,
+    sprintTapTimerMs,
     isDefending,
     isStrafing,
     strafeMs: remainingStrafeMs,

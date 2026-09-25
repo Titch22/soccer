@@ -18,6 +18,13 @@ export interface PlayerState {
   velocity: Vector2;
   facing: number;
   isSprinting: boolean;
+  /** Extra effort boost active (visible to everyone). */
+  extraEffortActive: boolean;
+  /** Extra effort bar (0..EXTRA_EFFORT_MAX); local-only display. */
+  extraEffort: number;
+  /** Last tick's sprint input, and time left to register a second tap (double-tap detection). */
+  prevSprintHeld: boolean;
+  sprintTapTimerMs: number;
   /** Defensive stance active (visible to everyone). */
   isDefending: boolean;
   /** Mid strafe dash (bigger hitbox). */

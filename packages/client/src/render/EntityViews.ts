@@ -1,4 +1,4 @@
-import { BALL_RADIUS, DEFEND_HITBOX_SCALE, PLAYER_RADIUS, STRAFE_HITBOX_SCALE } from "@rematch/shared";
+import { BALL_RADIUS, DEFEND_HITBOX_SCALE, EXTRA_EFFORT_HITBOX_SCALE, PLAYER_RADIUS, STRAFE_HITBOX_SCALE } from "@rematch/shared";
 import { Container, Graphics } from "pixi.js";
 
 const PASS_AIM_LINE_MIN_LENGTH = 34;
@@ -26,6 +26,11 @@ const BALL_INDICATOR_COLOR = 0xffffff;
 const STAMINA_BAR_WIDTH = 300;
 const STAMINA_BAR_HEIGHT = 18;
 const STAMINA_BAR_BOTTOM_MARGIN = 28;
+const EXTRA_BAR_HEIGHT = 10;
+const EXTRA_BAR_GAP = 6;
+const EXTRA_BAR_COLOR = 0x38bdf8;
+const EXTRA_BAR_ACTIVE_COLOR = 0xe0f2fe;
+const EXTRA_EFFORT_TRAIL_COLOR = 0x7dd3fc;
 
 function staminaColor(ratio: number): number {
   // Green when full, fading through amber to red as it depletes.
@@ -65,6 +70,8 @@ export interface PlayerStatus {
   /** Defensive stance active / strafing (bigger hitbox). */
   defending: boolean;
   strafing: boolean;
+  /** Extra effort boost active. */
+  extraEffort: boolean;
   /** World-space movement direction (radians) and speed, used for the sprint/tackle streaks. */
   velocityAngle: number;
   speed: number;
@@ -161,7 +168,7 @@ export function createPlayerView(color: number, isSelf: boolean): PlayerView {
     setStatus(status: PlayerStatus, nowMs: number) {
       possessionRing.visible = status.possessing && !status.stunned;
       stanceArc.visible = status.defending && !status.stunned;
-      const hitboxScale = status.strafing ? STRAFE_HITBOX_SCALE : status.defending ? DEFEND_HITBOX_SCALE : 1;
+      const hitboxScale = status.strafing ? STRAFE_HITBOX_SCALE : status.defending ? DEFEND_HITBOX_SCALE : status.extraEffort ? EXTRA_EFFORT_HITBOX_SCALE : 1;
       hitboxRing.visible = hitboxScale > 1;
       hitboxRing.scale.set(hitboxScale);
       // The ring is drawn in local space, so keep it un-rotated (a circle either way).
@@ -178,11 +185,12 @@ export function createPlayerView(color: number, isSelf: boolean): PlayerView {
       tackleFlash.scale.set(status.tackling ? 1.35 : 1, status.tackling ? 0.8 : 1);
 
       // Streaks behind the movement direction while sprinting (or lunging).
-      const showTrail = (status.sprinting || status.tackling) && status.speed > SPRINT_TRAIL_MIN_SPEED;
+      const showTrail = (status.sprinting || status.tackling || status.extraEffort) && status.speed > SPRINT_TRAIL_MIN_SPEED;
       trail.visible = showTrail;
       if (showTrail) {
-        const length = status.tackling ? 46 : 26;
-        const alpha = status.tackling ? 0.7 : 0.45;
+        const length = status.tackling ? 46 : status.extraEffort ? 50 : 26;
+        const alpha = status.tackling ? 0.7 : status.extraEffort ? 0.85 : 0.45;
+        const trailColor = status.extraEffort ? EXTRA_EFFORT_TRAIL_COLOR : 0xffffff;
         trail.clear();
         for (const offset of [-0.55, 0, 0.55]) {
           const y = offset * PLAYER_RADIUS;
@@ -190,7 +198,7 @@ export function createPlayerView(color: number, isSelf: boolean): PlayerView {
           trail
             .moveTo(-PLAYER_RADIUS * 0.6, y)
             .lineTo(-PLAYER_RADIUS * 0.6 - tail, y)
-            .stroke({ width: 3, color: 0xffffff, alpha, cap: "round" });
+            .stroke({ width: status.extraEffort ? 4 : 3, color: trailColor, alpha, cap: "round" });
         }
         trail.rotation = status.velocityAngle - container.rotation;
       }
@@ -286,6 +294,8 @@ export interface StaminaBarView {
   /** Pins the bar to the bottom centre of a screen of the given size (call on resize / every frame). */
   setScreenSize(screenWidth: number, screenHeight: number): void;
   setStamina(ratio: number): void;
+  /** Second bar, stacked above the stamina bar; brighter while the boost is active. */
+  setExtraEffort(ratio: number, active: boolean): void;
 }
 
 /**
@@ -299,13 +309,34 @@ export function createStaminaBarView(): StaminaBarView {
     .fill({ color: 0x000000, alpha: 0.6 })
     .stroke({ width: 2, color: 0xffffff, alpha: 0.85 });
   const fill = new Graphics();
-  container.addChild(background, fill);
+  const extraBackground = new Graphics()
+    .roundRect(-STAMINA_BAR_WIDTH / 2, -EXTRA_BAR_HEIGHT - EXTRA_BAR_GAP, STAMINA_BAR_WIDTH, EXTRA_BAR_HEIGHT, 5)
+    .fill({ color: 0x000000, alpha: 0.6 })
+    .stroke({ width: 2, color: 0xffffff, alpha: 0.85 });
+  const extraFill = new Graphics();
+  container.addChild(background, fill, extraBackground, extraFill);
   container.visible = false;
 
   return {
     container,
     setVisible(visible: boolean) {
       container.visible = visible;
+    },
+    setExtraEffort(ratio: number, active: boolean) {
+      const clamped = Math.max(0, Math.min(1, ratio));
+      const inset = 2;
+      const innerWidth = (STAMINA_BAR_WIDTH - inset * 2) * clamped;
+      extraFill.clear();
+      if (innerWidth <= 0) return;
+      extraFill
+        .roundRect(
+          -STAMINA_BAR_WIDTH / 2 + inset,
+          -EXTRA_BAR_HEIGHT - EXTRA_BAR_GAP + inset,
+          innerWidth,
+          EXTRA_BAR_HEIGHT - inset * 2,
+          3,
+        )
+        .fill({ color: active ? EXTRA_BAR_ACTIVE_COLOR : EXTRA_BAR_COLOR });
     },
     setScreenSize(screenWidth: number, screenHeight: number) {
       container.position.set(screenWidth / 2, screenHeight - STAMINA_BAR_HEIGHT - STAMINA_BAR_BOTTOM_MARGIN);

@@ -8,6 +8,7 @@ import {
   PASS_ASSIST_MAX_DISTANCE,
   BALL_CATCH_MAX_SPEED,
   BALL_INTERACT_INDICATOR_RADIUS,
+  EXTRA_EFFORT_BALL_KICK_SPEED,
   TAP_QUEUE_MS,
   PASS_BASE_SPEED,
   PASS_CHARGE_MAX_MS,
@@ -51,8 +52,10 @@ function findDribbler(ctx: BallControlContext): PlayerState | null {
   let best: PlayerState | null = null;
   let bestScore = -Infinity;
   for (const player of Object.values(players)) {
-    // A tackling player never gains possession - they only hit the ball away.
+    // A tackling or extra-effort-boosting player never gains possession - they
+    // just bump into the ball (tackles hit it away explicitly).
     if (player.possessionState === "stunned" || player.possessionState === "tackling") continue;
+    if (player.extraEffortActive) continue;
     if (player.id === ball.releaseLockPlayerId) continue;
     const toBall = sub(ball.position, player.position);
     const dist = length(toBall);
@@ -160,6 +163,20 @@ export function applyBallControl(ctx: BallControlContext): void {
     ball.lastTouchedByPlayerId = player.id;
     ball.lastTouchedTeamId = player.teamId;
     player.tackleHitDone = true;
+  }
+
+  // Starting an extra-effort boost while holding the ball loses it: it gets
+  // lightly launched along the run direction.
+  const boostingHolder = ball.possessedByPlayerId ? players[ball.possessedByPlayerId] : null;
+  if (boostingHolder?.extraEffortActive) {
+    const speed = length(boostingHolder.velocity);
+    const dir = speed > 1e-3 ? scale(boostingHolder.velocity, 1 / speed) : { x: Math.cos(boostingHolder.facing), y: Math.sin(boostingHolder.facing) };
+    releaseFromDribble(boostingHolder, ball);
+    boostingHolder.passChargeMs = 0;
+    boostingHolder.shootChargeMs = 0;
+    ball.velocity = scale(dir, EXTRA_EFFORT_BALL_KICK_SPEED);
+    ball.releaseLockPlayerId = boostingHolder.id;
+    ball.releaseLockMs = TAP_RELEASE_LOCK_DURATION_MS;
   }
 
   const currentHolder = ball.possessedByPlayerId ? players[ball.possessedByPlayerId] : null;
@@ -338,6 +355,7 @@ function releaseFromDribble(player: PlayerState, ball: BallState): void {
 function isNearLooseBall(player: PlayerState, ball: BallState): boolean {
   return (
     player.possessionState === "none" &&
+    !player.extraEffortActive &&
     ball.possessedByPlayerId === null &&
     player.id !== ball.releaseLockPlayerId &&
     length(ball.velocity) <= BALL_CATCH_MAX_SPEED &&

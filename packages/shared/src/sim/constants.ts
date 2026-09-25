@@ -29,11 +29,25 @@ export const STRAFE_STAMINA_COST = 20;
 // standing in defensive stance, and the bigger one during a strafe dash.
 export const DEFEND_HITBOX_SCALE = 1.4;
 export const STRAFE_HITBOX_SCALE = 1.7;
+// Boosting (extra effort) grows the hitbox so the player can push the ball along without possessing it.
+export const EXTRA_EFFORT_HITBOX_SCALE = 1.2;
 export const PLAYER_FRICTION = 900;
 // Inertia: effective acceleration is scaled by this factor when the desired
 // direction opposes current velocity (1.0 = full accel when aligned/starting
 // from rest, this value = full accel when trying to instantly reverse).
 export const PLAYER_TURN_ACCEL_FACTOR_MIN = 0.35;
+
+// Extra effort: a second, slow-filling bar. Double-tap the sprint button to
+// spend it on a short but faster boost. It fills more slowly the emptier the
+// normal stamina bar is (fill rate is scaled by the stamina ratio).
+export const EXTRA_EFFORT_MAX = 100;
+export const EXTRA_EFFORT_FILL_PER_SECOND = EXTRA_EFFORT_MAX / 6;
+export const EXTRA_EFFORT_DRAIN_PER_SECOND = 150;
+export const EXTRA_EFFORT_MIN_TO_ACTIVATE = EXTRA_EFFORT_MAX;
+export const EXTRA_EFFORT_MAX_SPEED = 300;
+// Boosting while holding the ball drops it: it's launched lightly along the run direction.
+export const EXTRA_EFFORT_BALL_KICK_SPEED = 320;
+export const SPRINT_DOUBLE_TAP_WINDOW_MS = 300;
 
 export const STAMINA_MAX = 100;
 // Full sprint drains a full bar in ~2.5s; standing/jogging refills it in ~5s.

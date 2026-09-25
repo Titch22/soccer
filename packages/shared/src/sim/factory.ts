@@ -1,4 +1,4 @@
-import { MATCH_DURATION_MS, PITCH_HEIGHT, PITCH_WIDTH, STAMINA_MAX, STRAFE_MAX_CHARGES } from "./constants";
+import { EXTRA_EFFORT_MAX, MATCH_DURATION_MS, PITCH_HEIGHT, PITCH_WIDTH, STAMINA_MAX, STRAFE_MAX_CHARGES } from "./constants";
 import { resetForKickoff } from "./rules";
 import type { MatchState, PlayerState } from "./types";
 
@@ -10,6 +10,10 @@ export function createPlayer(id: string, teamId: "A" | "B"): PlayerState {
     velocity: { x: 0, y: 0 },
     facing: teamId === "A" ? 0 : Math.PI,
     isSprinting: false,
+    extraEffortActive: false,
+    extraEffort: EXTRA_EFFORT_MAX,
+    prevSprintHeld: false,
+    sprintTapTimerMs: 0,
     isDefending: false,
     isStrafing: false,
     strafeMs: 0,
